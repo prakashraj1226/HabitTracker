@@ -1,0 +1,100 @@
+@if (view().status === 'loading') {
+  <app-loading-spinner label="Loading habit" />
+} @else if (view().status === 'missing') {
+  <app-empty-state title="Habit not found" message="This habit may have been deleted.">
+    <a class="btn btn--primary" routerLink="/habits">Back to habits</a>
+  </app-empty-state>
+} @else {
+  @if (view(); as ready) {
+    @if (ready.status === 'ready') {
+      <app-page-header [title]="ready.summary.habit.name" [subtitle]="ready.summary.habit.description || 'Habit details and completion history.'">
+        <a class="btn btn--secondary" [routerLink]="['/habits', ready.summary.habit.id, 'edit']">Edit</a>
+        <app-button variant="danger" (pressed)="confirmDelete.set(true)">Delete</app-button>
+      </app-page-header>
+
+      @if (notice()) {
+        <div class="banner banner--success" role="status">
+          <span>{{ notice() }}</span>
+          <app-button variant="ghost" size="sm" (pressed)="notice.set(null)">Dismiss</app-button>
+        </div>
+      }
+      @if (error() || ready.error) {
+        <div class="banner banner--error" role="alert">{{ error() || ready.error }}</div>
+      }
+
+      <div class="stack">
+        <section class="stat-grid">
+          <app-stat label="Current streak" [value]="streakLabel(ready.summary.currentStreak, ready.summary.streakUnit)" detail="Consecutive scheduled periods" />
+          <app-stat label="Longest streak" [value]="streakLabel(ready.summary.longestStreak, ready.summary.streakUnit)" detail="Best run so far" />
+          <app-stat label="Completion" [value]="ready.summary.completionPercentage + '%'" [detail]="ready.summary.completedCount + ' of ' + ready.summary.scheduledCount + ' scheduled'" />
+          <app-stat label="Status" [value]="habitStatus(ready.summary)" [detail]="frequencyLabel(ready.summary.habit)" />
+        </section>
+
+        <div class="detail-grid">
+          <app-card title="Habit information">
+            <div class="identity mb-16">
+              <span class="avatar" [style.background]="ready.summary.habit.color || fallbackColor">
+                <app-icon [name]="ready.summary.habit.icon || fallbackIcon" />
+              </span>
+              <span [class]="statusBadge(habitStatus(ready.summary))">{{ habitStatus(ready.summary) }}</span>
+            </div>
+            <dl class="meta">
+              <dt>Category</dt>
+              <dd>{{ ready.summary.habit.category }}</dd>
+              <dt>Frequency</dt>
+              <dd>{{ frequencyLabel(ready.summary.habit) }}</dd>
+              <dt>Start date</dt>
+              <dd>{{ ready.started }}</dd>
+              <dt>Reminder</dt>
+              <dd>{{ ready.summary.habit.reminderTime || 'None' }}</dd>
+              <dt>State</dt>
+              <dd>{{ ready.summary.habit.active ? 'Active' : 'Inactive' }}</dd>
+            </dl>
+          </app-card>
+
+          <app-card title="This week" hint="Scheduled days for the current week">
+            <app-week-bars [bars]="ready.week" />
+          </app-card>
+        </div>
+
+        <div class="detail-grid">
+          <app-card title="Monthly progress" [hint]="ready.monthLabel">
+            <app-line-chart [points]="ready.monthSeries" />
+            <div class="month-nav">
+              <app-button variant="secondary" size="sm" (pressed)="shiftMonth(-1)" aria-label="Previous month">Previous</app-button>
+              <p>{{ ready.monthLabel }}</p>
+              <app-button variant="secondary" size="sm" (pressed)="shiftMonth(1)" aria-label="Next month">Next</app-button>
+            </div>
+            <app-habit-calendar [cells]="ready.cells" (pick)="toggleDate($event)" />
+            <p class="hint mt-12">Select a scheduled day up to today to change its completion.</p>
+          </app-card>
+
+          <app-card title="Completion history" hint="Most recent scheduled days">
+            @if (ready.history.length === 0) {
+              <app-empty-state title="No completion history" message="History appears after the start date, once this habit is scheduled." />
+            } @else {
+              <div class="history">
+                @for (entry of ready.history; track entry.date) {
+                  <div class="history__row">
+                    <span>{{ entry.label }}</span>
+                    <span [class]="entry.completed ? 'badge badge--good' : 'badge badge--warn'">
+                      {{ entry.completed ? 'Completed' : 'Not completed' }}
+                    </span>
+                  </div>
+                }
+              </div>
+            }
+          </app-card>
+        </div>
+      </div>
+
+      <app-confirmation-dialog
+        [open]="confirmDelete()"
+        title="Delete habit"
+        [message]="'Delete ' + ready.summary.habit.name + '? This removes the habit and its completion history.'"
+        confirmLabel="Delete"
+        (confirmed)="deleteHabit()"
+        (cancelled)="confirmDelete.set(false)" />
+    }
+  }
+}

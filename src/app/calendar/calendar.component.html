@@ -1,0 +1,76 @@
+<app-page-header title="Calendar" subtitle="Select a date to review what was completed and what was still open." />
+
+@if (view(); as data) {
+  @if (error() || data.error) {
+    <div class="banner banner--error" role="alert">{{ error() || data.error }}</div>
+  }
+
+  @if (!data.hasHabits) {
+    <section class="card">
+      <app-empty-state title="No habit history yet" message="Add a habit before the calendar has anything to show.">
+        <a class="btn btn--primary" routerLink="/habits/new">Add habit</a>
+      </app-empty-state>
+    </section>
+  } @else {
+    <div class="calendar-layout">
+      <app-card title="Daily history" [hint]="data.monthLabel">
+        <div class="month-nav">
+          <app-button variant="secondary" size="sm" (pressed)="shiftMonth(-1)">Previous</app-button>
+          <p>{{ data.monthLabel }}</p>
+          <app-button variant="secondary" size="sm" (pressed)="shiftMonth(1)">Next</app-button>
+        </div>
+        <app-habit-calendar [cells]="data.cells" [selected]="selected()" (pick)="select($event)" />
+        <div class="legend">
+          <span><i class="is-complete"></i>Completed</span>
+          <span><i class="is-partial"></i>Partial</span>
+          <span><i class="is-miss"></i>Missed</span>
+          <span><i class="is-off"></i>Nothing due</span>
+        </div>
+      </app-card>
+
+      <app-card [title]="data.title">
+        @if (data.detail.timing === 'future') {
+          <p class="hint">This day has not started. {{ data.detail.total }} habit{{ data.detail.total === 1 ? '' : 's' }} will be due.</p>
+        } @else if (data.detail.total === 0) {
+          <app-empty-state title="Nothing scheduled" message="No active habits were due on this date." />
+        } @else {
+          <p role="status"><strong>{{ data.detail.percentage }}%</strong> · {{ data.detail.completedCount }} of {{ data.detail.total }} completed</p>
+        }
+
+        @if (data.detail.completed.length) {
+          <p class="section-label">Completed</p>
+          <div class="check-list">
+            @for (habit of data.detail.completed; track habit.id) {
+              <div class="check-list__item">
+                <span class="check-list__identity">
+                  <span class="avatar" [style.background]="habit.color || fallbackColor"><app-icon [name]="habit.icon || fallbackIcon" /></span>
+                  <span>{{ habit.name }}</span>
+                </span>
+                @if (data.detail.timing !== 'future') {
+                  <app-button variant="secondary" size="sm" (pressed)="toggle(habit)">Mark incomplete</app-button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (data.detail.open.length) {
+          <p class="section-label">{{ data.detail.timing === 'future' ? 'Scheduled' : data.detail.timing === 'today' ? 'Pending' : 'Not completed' }}</p>
+          <div class="check-list">
+            @for (habit of data.detail.open; track habit.id) {
+              <div class="check-list__item">
+                <span class="check-list__identity">
+                  <span class="avatar" [style.background]="habit.color || fallbackColor"><app-icon [name]="habit.icon || fallbackIcon" /></span>
+                  <span>{{ habit.name }}</span>
+                </span>
+                @if (data.detail.timing !== 'future') {
+                  <app-button size="sm" (pressed)="toggle(habit)">Mark complete</app-button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </app-card>
+    </div>
+  }
+}

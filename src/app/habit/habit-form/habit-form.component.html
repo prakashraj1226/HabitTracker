@@ -1,0 +1,145 @@
+@if (missing()) {
+  <app-empty-state title="Habit not found" message="This habit may have been deleted.">
+    <a class="btn btn--primary" routerLink="/habits">Back to habits</a>
+  </app-empty-state>
+} @else {
+  <app-page-header
+    [title]="editing() ? 'Edit habit' : 'Add habit'"
+    [subtitle]="editing() ? 'Update the schedule and details for this habit.' : 'Create a habit and choose when it should appear.'">
+    <a class="btn btn--secondary" routerLink="/habits">Cancel</a>
+  </app-page-header>
+
+  <section class="card">
+    <form class="card__body form-grid" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      @if (submitted() && form.invalid) {
+        <div class="banner banner--error field--full" role="alert">Check the highlighted fields and try again.</div>
+      }
+      @if (error()) {
+        <div class="banner banner--error field--full" role="alert">{{ error() }}</div>
+      }
+
+      <div class="field" [class.is-invalid]="invalid('name')">
+        <label class="label" for="habit-name">Habit name</label>
+        <input id="habit-name" class="input" type="text" formControlName="name" [attr.aria-invalid]="invalid('name')" />
+        @if (nameError(); as message) {
+          <span class="error">{{ message }}</span>
+        }
+      </div>
+
+      <div class="field" [class.is-invalid]="invalid('category')">
+        <label class="label" for="habit-category">Category</label>
+        <select id="habit-category" class="select" formControlName="category" [attr.aria-invalid]="invalid('category')">
+          <option value="" disabled>Select a category</option>
+          @for (category of categories; track category) {
+            <option [value]="category">{{ category }}</option>
+          }
+        </select>
+        @if (invalid('category')) {
+          <span class="error">Choose a category.</span>
+        }
+      </div>
+
+      <div class="field field--full" [class.is-invalid]="invalid('description')">
+        <label class="label" for="habit-description">Description</label>
+        <textarea id="habit-description" class="textarea" formControlName="description" maxlength="240"></textarea>
+        @if (invalid('description')) {
+          <span class="error">Keep the description under 240 characters.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label class="label" for="habit-frequency">Frequency</label>
+        <select id="habit-frequency" class="select" formControlName="frequency">
+          @for (option of frequencies; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+        <span class="hint">{{ frequencyHint }}</span>
+      </div>
+
+      <div class="field" [class.is-invalid]="invalid('startDate')">
+        <label class="label" for="habit-start">Start date</label>
+        <input id="habit-start" class="input" type="date" formControlName="startDate" [attr.aria-invalid]="invalid('startDate')" />
+        @if (invalid('startDate')) {
+          <span class="error">Choose a start date.</span>
+        }
+      </div>
+
+      @if (form.controls.frequency.value === 'CUSTOM') {
+        <div class="field field--full" [class.is-invalid]="(submitted() || form.controls.daysOfWeek.touched) && form.hasError('customDays')">
+          <span class="label">Days</span>
+          <div class="picker">
+            @for (day of weekdays; track day.value) {
+              <button
+                type="button"
+                class="day-choice"
+                [class.day-choice--selected]="form.controls.daysOfWeek.value.includes(day.value)"
+                [attr.aria-pressed]="form.controls.daysOfWeek.value.includes(day.value)"
+                (click)="toggleDay(day.value)">
+                {{ day.label }}
+              </button>
+            }
+          </div>
+          @if ((submitted() || form.controls.daysOfWeek.touched) && form.hasError('customDays')) {
+            <span class="error">Choose at least one day.</span>
+          }
+        </div>
+      }
+
+      <div class="field">
+        <label class="label" for="habit-reminder">Reminder time</label>
+        <input id="habit-reminder" class="input" type="time" formControlName="reminderTime" />
+        <span class="hint">Saved for your reference. This app does not send notifications.</span>
+      </div>
+
+      <div class="field">
+        <span class="label">Status</span>
+        <label class="switch">
+          <input type="checkbox" formControlName="active" />
+          <span class="switch__track"></span>
+          <span>{{ form.controls.active.value ? 'Active' : 'Inactive' }}</span>
+        </label>
+        <span class="hint">Inactive habits stay in the list but are not scheduled.</span>
+      </div>
+
+      <div class="field field--full">
+        <span class="label">Color</span>
+        <div class="picker">
+          @for (color of colors; track color.id) {
+            <button
+              type="button"
+              class="swatch"
+              [class.swatch--selected]="form.controls.color.value === color.value"
+              [style.background]="color.value"
+              [attr.aria-label]="color.label"
+              [attr.aria-pressed]="form.controls.color.value === color.value"
+              (click)="form.controls.color.setValue(color.value)">
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="field field--full">
+        <span class="label">Icon</span>
+        <div class="picker">
+          @for (icon of icons; track icon.id) {
+            <button
+              type="button"
+              class="icon-choice"
+              [class.icon-choice--selected]="form.controls.icon.value === icon.id"
+              [attr.aria-label]="icon.label"
+              [attr.aria-pressed]="form.controls.icon.value === icon.id"
+              (click)="form.controls.icon.setValue(icon.id)">
+              <app-icon [name]="icon.id" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a class="btn btn--secondary" routerLink="/habits">Cancel</a>
+        <app-button type="submit">{{ editing() ? 'Update habit' : 'Save habit' }}</app-button>
+      </div>
+    </form>
+  </section>
+}
