@@ -53,10 +53,10 @@ img {
   left: 12px;
   top: -48px;
   z-index: 80;
-  background: var(--surface);
+  background: var(--card);
   color: var(--ink);
   padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   text-decoration: none;
   font-weight: 700;
 }

@@ -1,7 +1,15 @@
-export type HabitFrequency = 'DAILY' | 'WEEKLY' | 'CUSTOM';
+export type HabitFrequency = 'DAILY' | 'CUSTOM' | 'WEEKLY' | 'MONTHLY';
 export type HabitKind = 'tick' | 'measurable';
 export type HabitIntent = 'build' | 'quit';
-export type HabitRepeat = 'once' | 'multiple' | 'weekly';
+export type ReminderRepeat = 'daily' | 'scheduled';
+
+export interface HabitReminder {
+  id: number;
+  time: string;
+  enabled: boolean;
+  message: string;
+  repeat: ReminderRepeat;
+}
 
 export interface Habit {
   id: number;
@@ -10,36 +18,22 @@ export interface Habit {
   category: string;
   frequency: HabitFrequency;
   startDate: string;
-  reminderTime?: string;
-  reminderEnabled?: boolean;
   color?: string;
   icon?: string;
   active: boolean;
   createdAt: string;
   updatedAt: string;
   daysOfWeek?: number[];
+  timesPerWeek?: number;
+  dayOfMonth?: number;
   kind?: HabitKind;
   intent?: HabitIntent;
-  repeat?: HabitRepeat;
   unit?: string;
   target?: number;
-}
-
-export interface HabitDraft {
-  name: string;
-  description?: string;
-  category: string;
-  frequency: HabitFrequency;
-  startDate: string;
+  reminders?: HabitReminder[];
   reminderTime?: string;
   reminderEnabled?: boolean;
-  color?: string;
-  icon?: string;
-  active: boolean;
-  daysOfWeek?: number[];
-  kind?: HabitKind;
-  intent?: HabitIntent;
-  repeat?: HabitRepeat;
-  unit?: string;
-  target?: number;
+  repeat?: 'once' | 'multiple' | 'weekly';
 }
+
+export type HabitDraft = Omit<Habit, 'id' | 'createdAt' | 'updatedAt'>;

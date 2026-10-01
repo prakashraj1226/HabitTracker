@@ -42,6 +42,11 @@ const ICONS: Record<string, string> = {
   reset: svg('<path d="M4 12a8 8 0 1 0 2-5.3"/><path d="M4 4v5h5"/>'),
   gear: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/>'),
   alert: svg('<path d="M12 3l10 17H2L12 3z"/><path d="M12 9v5M12 17h.01"/>'),
+  stats: svg('<path d="M5 20V11M12 20V5M19 20v-7"/>'),
+  home: svg('<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>'),
+  trophy: svg('<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/>'),
+  note: svg('<path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5M8 13h8M8 17h5"/>'),
+  minus: svg('<path d="M5 12h14"/>'),
   inbox: svg('<path d="M3 13l3-8h12l3 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/><path d="M3 13h5l2 3h4l2-3h5"/>'),
 };
 

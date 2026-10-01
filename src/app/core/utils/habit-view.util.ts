@@ -1,85 +1,56 @@
-import { HabitCompletion } from '../models/habit-completion.model';
-import { Habit, HabitKind, HabitRepeat } from '../models/habit.model';
+import { DEFAULT_COLOR, WEEKDAY_OPTIONS } from '../constants/habit.constants';
+import { Habit } from '../models/habit.model';
 import { addDays, parseDateKey, startOfDay, toDateKey } from './date.util';
 
-export function habitKind(habit: Habit): HabitKind {
-  return habit.kind === 'measurable' ? 'measurable' : 'tick';
-}
-
-export function habitRepeat(habit: Habit): HabitRepeat {
-  if (habit.repeat) {
-    return habit.repeat;
-  }
-  return habit.frequency === 'WEEKLY' ? 'weekly' : 'once';
-}
-
 export function habitColor(habit: Habit): string {
-  return habit.color || '#3DDC97';
+  return habit.color || DEFAULT_COLOR;
 }
 
-export function findCompletion(completions: HabitCompletion[], habitId: number, date: string): HabitCompletion | undefined {
-  return completions.find((item) => item.habitId === habitId && item.date === date);
-}
-
-export function amountOf(completion: HabitCompletion | undefined): number {
-  if (!completion) {
-    return 0;
-  }
-  if (typeof completion.value === 'number') {
-    return completion.value;
-  }
-  return completion.completed ? 1 : 0;
-}
-
-export function isDone(completion: HabitCompletion | undefined): boolean {
-  return amountOf(completion) > 0;
-}
-
-export function streakCount(habitId: number, completions: HabitCompletion[], today = new Date()): number {
-  let cursor = startOfDay(today);
-  if (!isDone(findCompletion(completions, habitId, toDateKey(cursor)))) {
-    cursor = addDays(cursor, -1);
-  }
-  let count = 0;
-  for (let index = 0; index < 365; index += 1) {
-    if (!isDone(findCompletion(completions, habitId, toDateKey(cursor)))) {
-      break;
+export function frequencyLabel(habit: Habit): string {
+  switch (habit.frequency) {
+    case 'CUSTOM': {
+      const days = habit.daysOfWeek ?? [];
+      if (days.length === 7) {
+        return 'Every day';
+      }
+      return WEEKDAY_OPTIONS.filter((option) => days.includes(option.value)).map((option) => option.label).join(', ');
     }
-    count += 1;
-    cursor = addDays(cursor, -1);
+    case 'WEEKLY':
+      return `${habit.timesPerWeek ?? 1}× per week`;
+    case 'MONTHLY':
+      return `Monthly on the ${ordinal(habit.dayOfMonth ?? 1)}`;
+    default:
+      return 'Every day';
   }
-  return count;
 }
 
-export function weekProgress(habitId: number, completions: HabitCompletion[], week: Date[]): { done: number; total: number } {
-  const done = week.filter((date) => isDone(findCompletion(completions, habitId, toDateKey(date)))).length;
-  return { done, total: week.length };
-}
-
-export function weekAmount(habitId: number, completions: HabitCompletion[], week: Date[]): number {
-  return week.reduce((sum, date) => sum + amountOf(findCompletion(completions, habitId, toDateKey(date))), 0);
-}
-
-export function scheduledOn(habit: Habit, date: Date): boolean {
-  if (!habit.daysOfWeek?.length || habit.frequency !== 'CUSTOM') {
-    return true;
+export function targetLabel(habit: Habit): string {
+  const target = habit.target ?? 1;
+  if (habit.kind === 'measurable') {
+    return `${target} ${habit.unit ?? ''}`.trim();
   }
-  return habit.daysOfWeek.includes(date.getDay());
+  return target > 1 ? `${target}× a day` : '';
+}
+
+export function greeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour < 5) {
+    return 'Good night';
+  }
+  if (hour < 12) {
+    return 'Good morning';
+  }
+  if (hour < 17) {
+    return 'Good afternoon';
+  }
+  return 'Good evening';
 }
 
 export function heatmapWeeks(today: Date, weeks = 18): Date[][] {
   const end = startOfDay(today);
   const mondayOffset = (end.getDay() + 6) % 7;
   const start = addDays(end, -mondayOffset - ((weeks - 1) * 7));
-  const columns: Date[][] = [];
-  for (let week = 0; week < weeks; week += 1) {
-    const column: Date[] = [];
-    for (let day = 0; day < 7; day += 1) {
-      column.push(addDays(start, week * 7 + day));
-    }
-    columns.push(column);
-  }
-  return columns;
+  return Array.from({ length: weeks }, (_, week) => Array.from({ length: 7 }, (__, day) => addDays(start, week * 7 + day)));
 }
 
 export function monthCells(month: Date): Array<{ date: Date; inMonth: boolean }> {
@@ -127,9 +98,7 @@ export function parseTime(value: string): { hour: number; minute: number; meridi
   const [rawHour, rawMinute] = value.split(':').map(Number);
   const hour24 = Number.isFinite(rawHour) ? rawHour : 9;
   const minute = Number.isFinite(rawMinute) ? rawMinute : 0;
-  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
-  const hour = hour24 % 12 || 12;
-  return { hour, minute, meridiem };
+  return { hour: hour24 % 12 || 12, minute, meridiem: hour24 >= 12 ? 'PM' : 'AM' };
 }
 
 export function toTimeValue(hour: number, minute: number, meridiem: 'AM' | 'PM'): string {

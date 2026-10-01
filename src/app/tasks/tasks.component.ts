@@ -14,8 +14,12 @@ import { EntrySheetComponent } from '../plan/entry-sheet.component';
     <section class="ht-page">
       <header class="ht-top">
         <h1 class="ht-title">{{ heading }}</h1>
-        <a class="ht-icon-btn" routerLink="/settings" aria-label="Settings"><app-icon name="settings" /></a>
+        <a class="ht-icon-btn ht-mobile-only" routerLink="/settings" aria-label="Settings"><app-icon name="gear" /></a>
       </header>
+      <nav class="ht-seg" aria-label="Plan or tasks">
+        <a routerLink="/plan">Plan</a>
+        <a routerLink="/tasks" class="is-on" aria-current="page">Tasks</a>
+      </nav>
       <div class="ht-views">
         <button type="button" [class.is-on]="!listMode()" (click)="listMode.set(false)">Timeline</button>
         <button type="button" [class.is-on]="listMode()" (click)="listMode.set(true)">All Tasks</button>

@@ -1,7 +1,9 @@
 import { inject } from '@angular/core';
 import { STORAGE_KEYS } from '../constants/habit.constants';
 import { AppMeta } from '../models/settings.model';
+import { AchievementService } from '../services/achievement.service';
 import { EntryService } from '../services/entry.service';
+import { GoalService } from '../services/goal.service';
 import { HabitCompletionService } from '../services/habit-completion.service';
 import { HabitService } from '../services/habit.service';
 import { ReminderService } from '../services/reminder.service';
@@ -13,11 +15,15 @@ export function prepareTracker(): Promise<void> {
   const habits = inject(HabitService);
   const completions = inject(HabitCompletionService);
   const entries = inject(EntryService);
+  const goals = inject(GoalService);
+  const achievements = inject(AchievementService);
   const reminders = inject(ReminderService);
   return storage.load().then(async (loaded) => {
-    habits.reload();
-    completions.reload();
+    achievements.reload();
+    goals.reload();
     entries.reload();
+    completions.reload();
+    habits.reload();
     if (loaded) {
       seedTrackerData(storage, habits, completions);
     }
@@ -25,26 +31,15 @@ export function prepareTracker(): Promise<void> {
   });
 }
 
-export function seedTrackerData(
-  storage: StorageService,
-  habits: HabitService,
-  completions: HabitCompletionService,
-): void {
-  let meta: AppMeta | null = null;
-  try {
-    meta = storage.get<AppMeta>(STORAGE_KEYS.meta);
-  } catch {
-    return;
-  }
+function seedTrackerData(storage: StorageService, habits: HabitService, completions: HabitCompletionService): void {
+  const meta = storage.get<AppMeta>(STORAGE_KEYS.meta);
   if (meta?.seeded) {
     return;
   }
-  if (habits.getAll().length || completions.getAll().length) {
-    storage.set(STORAGE_KEYS.meta, { seeded: true });
-    return;
+  if (!habits.getAll().length && !completions.getAll().length) {
+    const seed = buildSeedData(new Date());
+    completions.replaceAll(seed.completions);
+    habits.replaceAll(seed.habits);
   }
-  const seed = buildSeedData(new Date());
-  habits.replaceAll(seed.habits);
-  completions.replaceAll(seed.completions);
   storage.set(STORAGE_KEYS.meta, { seeded: true });
 }

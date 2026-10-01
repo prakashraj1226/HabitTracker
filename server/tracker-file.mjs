@@ -10,26 +10,26 @@ const filePath = process.env.TRACKER_FILE
 const port = Number(process.env.TRACKER_PORT ?? 4300);
 const maxBytes = 2 * 1024 * 1024;
 
+const LISTS = ['habits', 'completions', 'entries', 'goals', 'achievements'];
+const THEMES = ['dark', 'light', 'system'];
+
 function emptyDocument() {
-  return {
-    habits: [],
-    completions: [],
-    settings: { displayName: '' },
-    meta: { seeded: false },
-  };
+  return normalize({});
 }
 
 function normalize(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Invalid tracker file.');
   }
+  const document = {};
+  for (const key of LISTS) {
+    document[key] = Array.isArray(value[key]) ? value[key] : [];
+  }
   const displayName = typeof value.settings?.displayName === 'string' ? value.settings.displayName.slice(0, 40) : '';
-  return {
-    habits: Array.isArray(value.habits) ? value.habits : [],
-    completions: Array.isArray(value.completions) ? value.completions : [],
-    settings: { displayName },
-    meta: { seeded: Boolean(value.meta?.seeded) },
-  };
+  const theme = THEMES.includes(value.settings?.theme) ? value.settings.theme : 'dark';
+  document.settings = { displayName, theme };
+  document.meta = { seeded: Boolean(value.meta?.seeded) };
+  return document;
 }
 
 function readDocument() {

@@ -14,8 +14,12 @@ import { EntrySheetComponent } from './entry-sheet.component';
     <section class="ht-page">
       <header class="ht-top">
         <h1 class="ht-title">{{ heading }}</h1>
-        <a class="ht-icon-btn" routerLink="/settings" aria-label="Settings"><app-icon name="settings" /></a>
+        <a class="ht-icon-btn ht-mobile-only" routerLink="/settings" aria-label="Settings"><app-icon name="gear" /></a>
       </header>
+      <nav class="ht-seg" aria-label="Plan or tasks">
+        <a routerLink="/plan" class="is-on" aria-current="page">Plan</a>
+        <a routerLink="/tasks">Tasks</a>
+      </nav>
       <div class="ht-weekstrip">
         @for (day of week; track day.getTime()) {
           <button type="button" [class.is-on]="selectedKey() === key(day)" (click)="selected.set(day)">

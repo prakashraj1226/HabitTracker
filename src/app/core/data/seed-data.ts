@@ -1,92 +1,75 @@
 import { Habit } from '../models/habit.model';
 import { HabitCompletion } from '../models/habit-completion.model';
 import { addDays, parseDateKey, startOfDay, toDateKey } from '../utils/date.util';
-import { isScheduled } from '../utils/progress.util';
+import { isScheduledOn } from '../utils/stats.util';
 
 export function buildSeedData(today: Date): { habits: Habit[]; completions: HabitCompletion[] } {
-  const created = addDays(startOfDay(today), -28).toISOString();
+  const end = startOfDay(today);
+  const created = addDays(end, -28).toISOString();
+  const base = (id: number, daysAgo: number, fields: Partial<Habit>): Habit => ({
+    id,
+    name: '',
+    category: 'Health',
+    frequency: 'DAILY',
+    startDate: toDateKey(addDays(end, -daysAgo)),
+    active: true,
+    createdAt: created,
+    updatedAt: created,
+    kind: 'tick',
+    intent: 'build',
+    target: 1,
+    reminders: [],
+    ...fields,
+  });
   const habits: Habit[] = [
-    habit(1, 'Morning run', 'Run for at least 20 minutes.', 'Fitness', 'DAILY', 21, '06:30', '#1f5fbf', 'activity', true, created, today),
-    habit(2, 'Read 20 pages', 'Read without switching tasks.', 'Learning', 'DAILY', 18, '21:00', '#0f766e', 'book', true, created, today),
-    habit(3, 'Drink water', 'Finish eight glasses through the day.', 'Health', 'DAILY', 14, '09:00', '#0369a1', 'droplet', true, created, today),
-    habit(4, 'Weekly review', 'Review the week and set the next priorities.', 'Productivity', 'WEEKLY', 28, '17:30', '#b45309', 'target', true, created, today),
-    habit(5, 'Meditation', 'Sit for ten quiet minutes.', 'Mindfulness', 'CUSTOM', 20, '07:15', '#3730a3', 'sun', true, created, today, [1, 2, 3, 4, 5]),
-    habit(6, 'Evening stretch', 'Ten minutes of mobility before bed.', 'Health', 'DAILY', 16, '21:30', '#334155', 'heart', false, created, today),
+    base(1, 21, { name: 'Morning run', description: 'Run for at least 20 minutes.', category: 'Fitness', icon: 'run', color: '#7eb6ff',
+      reminders: [{ id: 1, time: '06:30', enabled: true, message: 'Shoes on, out the door!', repeat: 'daily' }] }),
+    base(2, 18, { name: 'Read', description: 'Read without switching tasks.', category: 'Learning', icon: 'book', color: '#9b8cff',
+      kind: 'measurable', unit: 'pages', target: 20 }),
+    base(3, 14, { name: 'Drink water', category: 'Health', icon: 'droplet', color: '#5eead4', kind: 'measurable', unit: 'glasses', target: 8 }),
+    base(4, 28, { name: 'Gym', category: 'Fitness', icon: 'gym', color: '#f6ad7b', frequency: 'WEEKLY', timesPerWeek: 3 }),
+    base(5, 20, { name: 'Meditation', description: 'Ten quiet minutes.', category: 'Personal', icon: 'sun', color: '#c084fc',
+      frequency: 'CUSTOM', daysOfWeek: [1, 2, 3, 4, 5] }),
+    base(6, 60, { name: 'Pay bills', category: 'Finances', icon: 'target', color: '#f28b82', frequency: 'MONTHLY', dayOfMonth: 1 }),
   ];
 
   const completions: HabitCompletion[] = [];
   let completionId = 1;
-  for (const item of habits) {
-    let cursor = parseDateKey(item.startDate);
-    const end = startOfDay(today);
-    while (toDateKey(cursor) <= toDateKey(end)) {
-      if (isScheduled(item, cursor) && shouldComplete(item.id, cursor, today)) {
+  for (const habit of habits) {
+    for (let day = parseDateKey(habit.startDate); day <= end; day = addDays(day, 1)) {
+      const value = seedValue(habit, day, end);
+      if (value > 0 && (isScheduledOn(habit, day) || habit.frequency === 'WEEKLY')) {
         completions.push({
-          id: completionId,
-          habitId: item.id,
-          date: toDateKey(cursor),
+          id: completionId++,
+          habitId: habit.id,
+          date: toDateKey(day),
           completed: true,
-          completedAt: new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 8, 0, 0).toISOString(),
+          value,
+          completedAt: new Date(day.getFullYear(), day.getMonth(), day.getDate(), 8, 0, 0).toISOString(),
         });
-        completionId += 1;
       }
-      cursor = addDays(cursor, 1);
     }
   }
   return { habits, completions };
 }
 
-function habit(
-  id: number,
-  name: string,
-  description: string,
-  category: string,
-  frequency: Habit['frequency'],
-  daysAgo: number,
-  reminderTime: string,
-  color: string,
-  icon: string,
-  active: boolean,
-  createdAt: string,
-  today: Date,
-  daysOfWeek?: number[],
-): Habit {
-  return {
-    id,
-    name,
-    description,
-    category,
-    frequency,
-    startDate: toDateKey(addDays(today, -daysAgo)),
-    reminderTime,
-    color,
-    icon,
-    active,
-    createdAt,
-    updatedAt: createdAt,
-    daysOfWeek,
-  };
-}
-
-function shouldComplete(habitId: number, date: Date, today: Date): boolean {
-  const key = toDateKey(date);
-  const todayKey = toDateKey(today);
-  if (key === todayKey) {
-    return habitId === 2 || habitId === 3;
-  }
+function seedValue(habit: Habit, date: Date, today: Date): number {
+  const isToday = toDateKey(date) === toDateKey(today);
   const dayOfMonth = date.getDate();
-  switch (habitId) {
+  switch (habit.id) {
     case 1:
-      return date.getDay() !== 0;
+      return !isToday && date.getDay() !== 0 ? 1 : 0;
     case 2:
-      return dayOfMonth % 5 !== 0;
+      return isToday ? 12 : dayOfMonth % 5 === 0 ? 0 : 20 + (dayOfMonth % 3) * 5;
     case 3:
+      return isToday ? 5 : 6 + (dayOfMonth % 4);
     case 4:
+      return [1, 3, 5].includes(date.getDay()) && !isToday ? 1 : 0;
     case 5:
-      return true;
+      return isToday ? 0 : 1;
     case 6:
-      return dayOfMonth % 2 === 0;
+      return 1;
     default:
-      return false;
+      return 0;
   }
 }

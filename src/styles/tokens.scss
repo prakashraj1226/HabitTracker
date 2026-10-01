@@ -1,29 +1,59 @@
-:root {
+:root,
+:root[data-theme="dark"] {
   --font-sans: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --bg: #0c0e12;
-  --surface: #171a21;
-  --surface-muted: #353d4d;
-  --ink: #f3f6fa;
-  --ink-secondary: #b7c0ce;
-  --line: #3d4658;
-  --line-strong: #526074;
-  --sidebar: #3a4252;
-  --sidebar-elevated: #2e3646;
-  --sidebar-ink: #e7edf5;
-  --sidebar-muted: #aeb6c4;
-  --accent: #2f95f5;
-  --accent-strong: #1d7ed4;
-  --accent-soft: rgba(47, 149, 245, 0.2);
-  --good: #49d6a8;
-  --good-soft: rgba(73, 214, 168, 0.16);
-  --warn: #e2b340;
-  --warn-soft: rgba(226, 179, 64, 0.16);
-  --bad: #ef5b6a;
-  --bad-soft: rgba(239, 91, 106, 0.16);
-  --radius-sm: 6px;
-  --radius: 6px;
-  --shadow: none;
-  --sidebar-width: 252px;
-  --header-height: 64px;
-  --content-width: 1180px;
+  --app-bg: #07080b;
+  --bg: #0f1115;
+  --card: #161a22;
+  --card-2: #1c212c;
+  --line: #2a3140;
+  --line-2: #3a4254;
+  --track: #222733;
+  --ink: #f4f7fb;
+  --ink-2: #c5cedb;
+  --muted: #9aa3b2;
+  --faint: #5b6577;
+  --accent: #3ddc97;
+  --on-accent: #052e1c;
+  --accent-soft: rgba(61, 220, 151, 0.14);
+  --tick: #67e8f9;
+  --on-tick: #083344;
+  --measure: #f6ad7b;
+  --on-measure: #3b2416;
+  --measure-soft: #2a211c;
+  --bad: #fb7185;
+  --bad-soft: rgba(251, 113, 133, 0.14);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.16);
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --radius: 18px;
+  --side-width: 240px;
+}
+
+:root[data-theme="light"] {
+  --app-bg: #e6eaf0;
+  --bg: #f4f6fa;
+  --card: #ffffff;
+  --card-2: #eef1f6;
+  --line: #dde2ea;
+  --line-2: #c5ccd8;
+  --track: #e4e8ef;
+  --ink: #111827;
+  --ink-2: #374151;
+  --muted: #6b7280;
+  --faint: #a3aab6;
+  --accent: #0f9d63;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(15, 157, 99, 0.12);
+  --tick: #0891b2;
+  --on-tick: #ffffff;
+  --measure: #dd7a33;
+  --on-measure: #ffffff;
+  --measure-soft: #fdeede;
+  --bad: #e11d48;
+  --bad-soft: rgba(225, 29, 72, 0.1);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.12);
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --scrim: rgba(15, 23, 42, 0.4);
 }

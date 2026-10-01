@@ -5,4 +5,5 @@ export interface HabitCompletion {
   completed: boolean;
   completedAt?: string;
   value?: number;
+  note?: string;
 }
