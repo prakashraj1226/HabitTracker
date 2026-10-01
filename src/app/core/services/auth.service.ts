@@ -158,6 +158,20 @@ export class AuthService {
       throw new Error('That username and recovery code do not match.');
     }
     checkPassword(password);
+    return this.replaceSecrets(account, password);
+  }
+
+  async resetWithBiometric(username: string, password: string): Promise<string> {
+    const account = this.find(username);
+    if (!account?.biometric) {
+      throw new Error('Fingerprint is not turned on for this account. Use your recovery code.');
+    }
+    checkPassword(password);
+    await this.verifyBiometric(`Reset ${account.name}'s password`);
+    return this.replaceSecrets(account, password);
+  }
+
+  private async replaceSecrets(account: Account, password: string): Promise<string> {
     const recoveryCode = makeRecoveryCode();
     const salt = randomHex(16);
     const recoverySalt = randomHex(16);

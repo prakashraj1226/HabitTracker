@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "node scripts/start.mjs",
+    "reset-password": "node scripts/reset-password.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

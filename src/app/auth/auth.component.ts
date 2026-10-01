@@ -75,6 +75,18 @@ type Mode = 'login' | 'register' | 'forgot';
               <app-icon name="target" /> Unlock with fingerprint
             </button>
           }
+          @if (mode() === 'forgot') {
+            @if (canUseFingerprint()) {
+              <button type="button" class="btn btn--secondary" style="width: 100%; margin-top: 12px" [disabled]="busy()" (click)="fingerprintReset()">
+                <app-icon name="target" /> Lost the code? Reset with fingerprint
+              </button>
+            } @else {
+              <p class="ht-muted ht-small" style="margin-top: 12px">
+                Lost the code? On the phone, accounts with fingerprint turned on can reset with a fingerprint.
+                On the computer, run <code>npm run reset-password -- {{ username().trim() || 'username' }}</code> in the project folder.
+              </p>
+            }
+          }
 
           <nav class="ht-auth__links">
             @switch (mode()) {
@@ -122,9 +134,9 @@ export class AuthComponent implements OnInit {
       void this.router.navigateByUrl('/register');
       return;
     }
-    if (this.mode() === 'login' && (await this.auth.biometricAvailable())) {
+    if (this.mode() !== 'register' && (await this.auth.biometricAvailable())) {
       this.biometricReady.set(true);
-      if (this.canUseFingerprint()) {
+      if (this.mode() === 'login' && this.canUseFingerprint()) {
         void this.fingerprint();
       }
     }
@@ -167,6 +179,17 @@ export class AuthComponent implements OnInit {
     await this.run(async () => {
       await this.auth.loginWithBiometric(this.username());
       await this.router.navigateByUrl('/today');
+    });
+  }
+
+  async fingerprintReset(): Promise<void> {
+    this.error.set('');
+    if (this.password() !== this.confirm()) {
+      this.error.set('The two passwords do not match.');
+      return;
+    }
+    await this.run(async () => {
+      this.recoveryCode.set(await this.auth.resetWithBiometric(this.username(), this.password()));
     });
   }
 
