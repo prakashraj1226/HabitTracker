@@ -1,11 +1,9 @@
-import { Injectable } from '@angular/core';
-import { Capacitor } from '@capacitor/core';
-import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { STORAGE_KEYS } from '../constants/habit.constants';
 import { AppMeta, AppSettings, ThemeMode } from '../models/settings.model';
+import { FileStoreService } from './file-store.service';
 
-const PHONE_FILE = 'tracker.json';
 const THEMES: ThemeMode[] = ['dark', 'light', 'system'];
 
 const LIST_KEYS = {
@@ -18,36 +16,61 @@ const LIST_KEYS = {
 
 type ListName = (typeof LIST_KEYS)[keyof typeof LIST_KEYS];
 
-type TrackerDocument = Record<ListName, unknown[]> & {
+export type TrackerDocument = Record<ListName, unknown[]> & {
   settings: AppSettings;
   meta: AppMeta;
 };
 
 @Injectable({ providedIn: 'root' })
 export class StorageService {
+  private readonly files = inject(FileStoreService);
   private document = emptyDocument();
+  private userId: string | null = null;
   private saving: Promise<void> = Promise.resolve();
   private readonly errorSubject = new BehaviorSubject<string | null>(null);
-  private readonly loadingSubject = new BehaviorSubject<boolean>(true);
-  private readonly settingsSubject: BehaviorSubject<AppSettings>;
+  private readonly settingsSubject = new BehaviorSubject<AppSettings>(this.readSettings());
 
   readonly error$ = this.errorSubject.asObservable();
-  readonly loading$ = this.loadingSubject.asObservable();
-  readonly settings$: Observable<AppSettings>;
+  readonly settings$: Observable<AppSettings> = this.settingsSubject.asObservable();
 
-  constructor() {
-    this.settingsSubject = new BehaviorSubject(this.readSettings());
-    this.settings$ = this.settingsSubject.asObservable();
+  async open(userId: string): Promise<void> {
+    await this.close();
+    const value = await this.files.read({ kind: 'user', id: userId });
+    this.document = value === null ? emptyDocument() : normalizeDocument(value);
+    this.userId = userId;
+    this.errorSubject.next(null);
+    this.settingsSubject.next(this.readSettings());
   }
 
-  async load(): Promise<boolean> {
-    this.loadingSubject.next(true);
+  async create(userId: string, document: TrackerDocument | null, displayName: string): Promise<void> {
+    const initial = document ?? emptyDocument();
+    initial.settings = normalizeSettings({ ...initial.settings, displayName: initial.settings.displayName || displayName });
+    initial.meta = { seeded: true };
+    await this.files.write({ kind: 'user', id: userId }, initial);
+  }
+
+  async close(): Promise<void> {
+    await this.saving.catch(() => undefined);
+    this.userId = null;
+    this.document = emptyDocument();
+    this.settingsSubject.next(this.readSettings());
+  }
+
+  async readLegacy(): Promise<TrackerDocument | null> {
     try {
-      return Capacitor.isNativePlatform() ? await this.loadFromPhone() : await this.loadFromServer();
-    } finally {
-      this.settingsSubject.next(this.readSettings());
-      this.loadingSubject.next(false);
+      const value = await this.files.read({ kind: 'legacy' });
+      if (value === null) {
+        return null;
+      }
+      const document = normalizeDocument(value);
+      return document.habits.length || document.completions.length || document.entries.length ? document : null;
+    } catch {
+      return null;
     }
+  }
+
+  async removeUser(userId: string): Promise<void> {
+    await this.files.remove({ kind: 'user', id: userId });
   }
 
   get<T>(key: string): T | null {
@@ -63,20 +86,12 @@ export class StorageService {
     this.enqueueSave();
   }
 
-  remove(key: string): void {
-    if (key in LIST_KEYS) {
-      this.writeKey(key, []);
-    } else if (key === STORAGE_KEYS.settings) {
-      this.writeKey(key, { displayName: '', theme: 'dark' });
-      this.settingsSubject.next(this.readSettings());
-    } else if (key === STORAGE_KEYS.meta) {
-      this.writeKey(key, { seeded: false });
-    }
-    this.enqueueSave();
-  }
-
   saveSettings(settings: Partial<AppSettings>): void {
     this.set(STORAGE_KEYS.settings, { ...this.readSettings(), ...settings });
+  }
+
+  reportError(message: string | null): void {
+    this.errorSubject.next(message);
   }
 
   dismissError(): void {
@@ -110,115 +125,19 @@ export class StorageService {
     }
   }
 
-  private async loadFromServer(): Promise<boolean> {
-    try {
-      const response = await fetch('/api/tracker', { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error('The data file could not be loaded. Is the data server running (npm start)?');
-      }
-      this.document = normalizeDocument(await response.json());
-      if (this.importBrowserCopy()) {
-        await this.flush();
-      }
-      this.errorSubject.next(null);
-      return true;
-    } catch (error) {
-      this.errorSubject.next(
-        error instanceof Error && !(error instanceof TypeError)
-          ? error.message
-          : 'The data server is not reachable. Start the app with npm start.',
-      );
-      return false;
-    }
-  }
-
-  private async loadFromPhone(): Promise<boolean> {
-    try {
-      const result = await Filesystem.readFile({
-        path: PHONE_FILE,
-        directory: Directory.Data,
-        encoding: Encoding.UTF8,
-      });
-      const text = typeof result.data === 'string' ? result.data : await result.data.text();
-      this.document = normalizeDocument(JSON.parse(text));
-    } catch (error) {
-      if (!isMissingFile(error)) {
-        this.errorSubject.next('Saved habits on this phone could not be read.');
-        return false;
-      }
-      this.document = emptyDocument();
-    }
-    this.errorSubject.next(null);
-    return true;
-  }
-
-  private importBrowserCopy(): boolean {
-    const fileIsEmpty = this.document.habits.length === 0
-      && this.document.completions.length === 0
-      && !this.document.meta.seeded
-      && this.document.settings.displayName === '';
-    if (!fileIsEmpty) {
-      return false;
-    }
-    try {
-      const habits = readBrowserJson(STORAGE_KEYS.habits);
-      const completions = readBrowserJson(STORAGE_KEYS.completions);
-      const hasHabits = Array.isArray(habits) && habits.length > 0;
-      const hasCompletions = Array.isArray(completions) && completions.length > 0;
-      if (!hasHabits && !hasCompletions) {
-        return false;
-      }
-      this.document.habits = hasHabits ? habits : [];
-      this.document.completions = hasCompletions ? completions : [];
-      this.document.settings = normalizeSettings(readBrowserJson(STORAGE_KEYS.settings));
-      this.document.meta = { seeded: true };
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   private enqueueSave(): void {
-    this.saving = this.saving.catch(() => undefined).then(() => this.flush());
-  }
-
-  private async flush(): Promise<void> {
-    const body = `${JSON.stringify(this.document, null, 2)}\n`;
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await Filesystem.writeFile({
-          path: PHONE_FILE,
-          data: body,
-          directory: Directory.Data,
-          encoding: Encoding.UTF8,
-          recursive: true,
-        });
-      } catch {
-        this.fail('Changes could not be saved on this phone.');
-      }
-      this.errorSubject.next(null);
+    const userId = this.userId;
+    if (!userId) {
       return;
     }
-    let response: Response;
-    try {
-      response = await fetch('/api/tracker', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        cache: 'no-store',
+    const snapshot = structuredClone(this.document);
+    this.saving = this.saving
+      .catch(() => undefined)
+      .then(() => this.files.write({ kind: 'user', id: userId }, snapshot))
+      .then(() => this.errorSubject.next(null))
+      .catch((error: unknown) => {
+        this.errorSubject.next(error instanceof Error ? error.message : 'Changes could not be saved.');
       });
-    } catch {
-      this.fail('Changes were not saved: the data server is not reachable.');
-    }
-    if (!response.ok) {
-      this.fail('Changes could not be saved to data/tracker.json.');
-    }
-    this.errorSubject.next(null);
-  }
-
-  private fail(message: string): never {
-    this.errorSubject.next(message);
-    throw new Error(message);
   }
 }
 
@@ -230,7 +149,7 @@ function emptyDocument(): TrackerDocument {
     goals: [],
     achievements: [],
     settings: { displayName: '', theme: 'dark' },
-    meta: { seeded: false },
+    meta: { seeded: true },
   };
 }
 
@@ -245,7 +164,6 @@ function normalizeDocument(value: unknown): TrackerDocument {
     document[name] = Array.isArray(list) ? list : [];
   }
   document.settings = normalizeSettings(record['settings']);
-  document.meta = { seeded: isMeta(record['meta']) ? record['meta'].seeded : false };
   return document;
 }
 
@@ -257,16 +175,6 @@ function normalizeSettings(value: unknown): AppSettings {
   };
 }
 
-function readBrowserJson(key: string): unknown {
-  const raw = localStorage.getItem(key);
-  return raw === null ? null : (JSON.parse(raw) as unknown);
-}
-
 function isMeta(value: unknown): value is AppMeta {
   return !!value && typeof value === 'object' && typeof (value as AppMeta).seeded === 'boolean';
-}
-
-function isMissingFile(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
-  return /does not exist|not found|no such file/i.test(message);
 }

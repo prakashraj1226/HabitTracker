@@ -46,3 +46,7 @@ data/*.tmp
 
 # Installable Android package copied to the project root
 /HabitTracker.apk
+
+# Local accounts and per-user habit data
+/data/accounts.json
+/data/users/

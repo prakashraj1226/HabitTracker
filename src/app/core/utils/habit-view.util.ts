@@ -90,8 +90,8 @@ export function todayLabel(date = new Date()): string {
   return `Today, ${ordinal(date.getDate())} ${month}`;
 }
 
-export function shortMonth(date: Date): string {
-  return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+export function shortDay(date: Date): string {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 export function parseTime(value: string): { hour: number; minute: number; meridiem: 'AM' | 'PM' } {

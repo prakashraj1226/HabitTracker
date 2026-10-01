@@ -8,7 +8,7 @@ import { Habit, HabitFrequency } from '../core/models/habit.model';
 import { HabitCompletionService } from '../core/services/habit-completion.service';
 import { HabitService } from '../core/services/habit.service';
 import { addDays, startOfWeek, toDateKey, weekDates } from '../core/utils/date.util';
-import { frequencyLabel, habitColor, heatmapWeeks, shortMonth, todayLabel } from '../core/utils/habit-view.util';
+import { frequencyLabel, habitColor, heatmapWeeks, shortDay, todayLabel } from '../core/utils/habit-view.util';
 import {
   amountOn, dailyTarget, dayState, doneDaysBetween, habitStats, indexCompletions, isDoneOn, isFlexible,
   rangeTally, weeklyTarget,
@@ -128,7 +128,7 @@ type StatusFilter = 'active' | 'done' | 'todo' | 'missed' | 'archived';
                     <thead>
                       <tr>
                         <th></th>
-                        @for (weekStart of measureWeeks; track weekStart.getTime()) { <th>{{ shortMonth(weekStart) }}</th> }
+                        @for (weekStart of measureWeeks; track weekStart.getTime()) { <th>{{ shortDay(weekStart) }}</th> }
                       </tr>
                     </thead>
                     <tbody>
@@ -174,11 +174,11 @@ type StatusFilter = 'active' | 'done' | 'todo' | 'missed' | 'archived';
         </div>
       } @empty {
         <div class="ht-empty">
-          @if (habits().length) {
+          @if (inView().length) {
             <p>No habits match these filters.</p>
             <button type="button" class="btn btn--secondary" (click)="clearFilters()">Clear filters</button>
           } @else {
-            <p>No habits yet.</p>
+            <p>{{ view() === 'measure' ? 'No measurable habits yet.' : view() === 'tick' ? 'No tick habits yet.' : 'No habits yet.' }}</p>
             <a class="btn btn--primary" routerLink="/habits/new"><app-icon name="plus" /> Add a habit</a>
           }
         </div>
@@ -258,11 +258,19 @@ export class HomeComponent {
     return tests;
   });
 
+  readonly inView = computed(() => {
+    const view = this.view();
+    if (view === 'weekly') {
+      return this.habits();
+    }
+    return this.habits().filter((habit) => (view === 'measure') === (habit.kind === 'measurable'));
+  });
+
   readonly counts = computed(() => {
     const tests = this.matchesStatus();
     const result = {} as Record<StatusFilter, number>;
     for (const item of this.statuses) {
-      result[item.id] = this.habits().filter(tests[item.id]).length;
+      result[item.id] = this.inView().filter(tests[item.id]).length;
     }
     return result;
   });
@@ -272,7 +280,7 @@ export class HomeComponent {
     const category = this.category();
     const frequency = this.frequency();
     const test = this.matchesStatus()[this.status()];
-    return this.habits().filter((habit) => test(habit)
+    return this.inView().filter((habit) => test(habit)
       && (!category || habit.category === category)
       && (!frequency || habit.frequency === frequency)
       && (!query || `${habit.name} ${habit.description ?? ''} ${habit.category}`.toLowerCase().includes(query)));
@@ -294,7 +302,7 @@ export class HomeComponent {
   });
 
   readonly habitColor = habitColor;
-  readonly shortMonth = shortMonth;
+  readonly shortDay = shortDay;
 
   inputValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;

@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { AuthComponent } from './auth/auth.component';
+import { signedInGuard, signedOutGuard } from './core/auth.guard';
 import { CalendarComponent } from './calendar/calendar.component';
 import { HabitDetailComponent } from './habit/habit-detail/habit-detail.component';
 import { HabitWizardComponent } from './habit/habit-wizard/habit-wizard.component';
@@ -11,9 +13,13 @@ import { TasksComponent } from './tasks/tasks.component';
 import { TodayComponent } from './today/today.component';
 
 export const routes: Routes = [
+  { path: 'login', component: AuthComponent, canActivate: [signedOutGuard], data: { mode: 'login' }, title: 'Log in' },
+  { path: 'register', component: AuthComponent, canActivate: [signedOutGuard], data: { mode: 'register' }, title: 'Create account' },
+  { path: 'forgot', component: AuthComponent, canActivate: [signedOutGuard], data: { mode: 'forgot' }, title: 'Reset password' },
   {
     path: '',
     component: ShellComponent,
+    canActivate: [signedInGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'today' },
       { path: 'dashboard', redirectTo: 'today', pathMatch: 'full' },

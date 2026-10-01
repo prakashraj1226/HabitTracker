@@ -7,7 +7,7 @@ import { AchievementService } from '../../core/services/achievement.service';
 import { HabitCompletionService } from '../../core/services/habit-completion.service';
 import { HabitService } from '../../core/services/habit.service';
 import { StorageService } from '../../core/services/storage.service';
-import { ThemeService } from '../../core/services/theme.service';
+import { AuthService } from '../../core/services/auth.service';
 import { AchievementDef } from '../../core/utils/stats.util';
 
 type Tab = 'today' | 'habits' | 'calendar' | 'stats' | 'plan' | 'tasks' | 'settings';
@@ -37,7 +37,14 @@ const NAV: { tab: Tab; link: string; icon: string; label: string; pill: boolean 
           <a class="ht-side__add" routerLink="/habits/new"><app-icon name="plus" /> New habit</a>
         </nav>
         <nav class="ht-side__foot">
+          @if (account(); as user) {
+            <div class="ht-account">
+              <b>{{ user.name.charAt(0).toUpperCase() }}</b>
+              <span>{{ user.name }}<br /><small class="ht-muted">&#64;{{ user.username }}</small></span>
+            </div>
+          }
           <a routerLink="/settings" [class.is-on]="tab() === 'settings'"><app-icon name="gear" /> Settings</a>
+          <a href="" (click)="logout($event)"><app-icon name="chevronLeft" /> Log out</a>
         </nav>
       </aside>
 
@@ -89,6 +96,8 @@ const NAV: { tab: Tab; link: string; icon: string; label: string; pill: boolean 
 export class ShellComponent {
   private readonly router = inject(Router);
   private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+  readonly account = this.auth.current;
   private readonly url = toSignal(
     this.router.events.pipe(
       filter((event) => event instanceof NavigationEnd),
@@ -116,7 +125,6 @@ export class ShellComponent {
   private toastTimer = 0;
 
   constructor() {
-    inject(ThemeService);
     inject(AchievementService).newlyUnlocked$
       .pipe(takeUntilDestroyed(inject(DestroyRef)))
       .subscribe((achievement) => {
@@ -128,6 +136,11 @@ export class ShellComponent {
 
   dismissError(): void {
     this.storage.dismissError();
+  }
+
+  logout(event: Event): void {
+    event.preventDefault();
+    void this.auth.logout();
   }
 
   private path(): string {
