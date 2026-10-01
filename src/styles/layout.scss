@@ -1,5 +1,6 @@
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
 }
@@ -8,7 +9,9 @@
   background: var(--sidebar);
   color: var(--sidebar-ink);
   min-height: 100vh;
+  min-height: 100dvh;
   height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
   display: flex;

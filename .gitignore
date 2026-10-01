@@ -43,3 +43,6 @@ Thumbs.db
 
 # In-progress data file write
 data/*.tmp
+
+# Installable Android package copied to the project root
+/HabitTracker.apk

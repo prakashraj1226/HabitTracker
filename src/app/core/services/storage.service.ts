@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { STORAGE_KEYS } from '../constants/habit.constants';
 import { AppMeta, AppSettings } from '../models/settings.model';
+
+const PHONE_FILE = 'tracker.json';
 
 interface TrackerDocument {
   habits: unknown[];
@@ -26,6 +30,9 @@ export class StorageService {
   }
 
   async load(): Promise<boolean> {
+    if (Capacitor.isNativePlatform()) {
+      return this.loadFromPhone();
+    }
     try {
       const response = await fetch('/api/tracker', { cache: 'no-store' });
       if (!response.ok) {
@@ -145,7 +152,45 @@ export class StorageService {
     this.saving = this.saving.catch(() => undefined).then(() => this.flush());
   }
 
+  private async loadFromPhone(): Promise<boolean> {
+    try {
+      const result = await Filesystem.readFile({
+        path: PHONE_FILE,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      const text = typeof result.data === 'string' ? result.data : await result.data.text();
+      this.document = normalizeDocument(JSON.parse(text));
+    } catch (error) {
+      if (!isMissingFile(error)) {
+        this.errorSubject.next('Saved habits on this phone could not be read.');
+        this.settingsSubject.next(this.readSettings());
+        return false;
+      }
+      this.document = emptyDocument();
+    }
+    this.errorSubject.next(null);
+    this.settingsSubject.next(this.readSettings());
+    return true;
+  }
+
   private async flush(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Filesystem.writeFile({
+          path: PHONE_FILE,
+          data: `${JSON.stringify(this.document, null, 2)}\n`,
+          directory: Directory.Data,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+      } catch {
+        this.errorSubject.next('Changes could not be saved on this phone.');
+        throw new Error('Changes could not be saved on this phone.');
+      }
+      this.errorSubject.next(null);
+      return;
+    }
     const response = await fetch('/api/tracker', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -208,4 +253,9 @@ function isSettings(value: unknown): value is AppSettings {
 
 function isMeta(value: unknown): value is AppMeta {
   return !!value && typeof value === 'object' && typeof (value as AppMeta).seeded === 'boolean';
+}
+
+function isMissingFile(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return /does not exist|not found|no such file/i.test(message);
 }
