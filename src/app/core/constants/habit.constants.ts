@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   completions: 'habit-tracker.completions',
   meta: 'habit-tracker.meta',
   settings: 'habit-tracker.settings',
+  entries: 'habit-tracker.entries',
 } as const;
 
 export const HABIT_CATEGORIES = [

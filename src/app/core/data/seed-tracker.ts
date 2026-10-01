@@ -1,8 +1,10 @@
 import { inject } from '@angular/core';
 import { STORAGE_KEYS } from '../constants/habit.constants';
 import { AppMeta } from '../models/settings.model';
+import { EntryService } from '../services/entry.service';
 import { HabitCompletionService } from '../services/habit-completion.service';
 import { HabitService } from '../services/habit.service';
+import { ReminderService } from '../services/reminder.service';
 import { StorageService } from '../services/storage.service';
 import { buildSeedData } from './seed-data';
 
@@ -10,12 +12,16 @@ export function prepareTracker(): Promise<void> {
   const storage = inject(StorageService);
   const habits = inject(HabitService);
   const completions = inject(HabitCompletionService);
-  return storage.load().then((loaded) => {
+  const entries = inject(EntryService);
+  const reminders = inject(ReminderService);
+  return storage.load().then(async (loaded) => {
     habits.reload();
     completions.reload();
+    entries.reload();
     if (loaded) {
       seedTrackerData(storage, habits, completions);
     }
+    await reminders.refresh();
   });
 }
 

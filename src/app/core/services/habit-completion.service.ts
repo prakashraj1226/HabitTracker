@@ -18,6 +18,34 @@ export class HabitCompletionService {
     return this.subject.value;
   }
 
+  setValue(habitId: number, date: string, value: number): void {
+    const amount = Math.max(0, Math.round(value));
+    const items = [...this.subject.value];
+    const index = items.findIndex((item) => item.habitId === habitId && item.date === date);
+    const completed = amount > 0;
+    if (index === -1) {
+      if (!completed) {
+        return;
+      }
+      items.push({
+        id: this.nextId(),
+        habitId,
+        date,
+        completed,
+        value: amount,
+        completedAt: new Date().toISOString(),
+      });
+    } else {
+      items[index] = {
+        ...items[index],
+        completed,
+        value: amount,
+        completedAt: completed ? new Date().toISOString() : undefined,
+      };
+    }
+    this.persist(items);
+  }
+
   toggle(habitId: number, date: string): boolean {
     const items = [...this.subject.value];
     const index = items.findIndex((item) => item.habitId === habitId && item.date === date);

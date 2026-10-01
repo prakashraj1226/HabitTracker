@@ -1,72 +1,79 @@
 import { Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { combineLatest, map, take } from 'rxjs';
-import { CommonButtonComponent } from '../common/common-button/common-button.component';
-import { CommonCardComponent } from '../common/common-card/common-card.component';
-import { ConfirmationDialogComponent } from '../common/confirmation-dialog/confirmation-dialog.component';
-import { PageHeaderComponent } from '../common/page-header/page-header.component';
-import { STORAGE_KEYS } from '../core/constants/habit.constants';
-import { HabitCompletionService } from '../core/services/habit-completion.service';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
+import { IconComponent } from '../common/icon/icon.component';
 import { HabitService } from '../core/services/habit.service';
+import { ReminderService } from '../core/services/reminder.service';
 import { StorageService } from '../core/services/storage.service';
 
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, PageHeaderComponent, CommonCardComponent, CommonButtonComponent, ConfirmationDialogComponent],
-  templateUrl: './settings.component.html',
+  imports: [RouterLink, IconComponent],
+  template: `
+    <section class="ht-page">
+      <header class="ht-top">
+        <a class="ht-back" routerLink="/habits" aria-label="Back"><app-icon name="chevronLeft" /></a>
+        <h1 class="ht-title">Settings</h1>
+      </header>
+
+      <p class="ht-kicker">APP</p>
+      <div class="ht-settings">
+        <label class="ht-setting">
+          <app-icon name="pencil" />
+          <span>
+            <strong>Display name</strong>
+            <input class="ht-field" [value]="name()" (change)="saveName($event)" />
+          </span>
+        </label>
+        <button type="button" class="ht-setting" (click)="allowReminders()">
+          <app-icon name="bell" />
+          <span>
+            <strong>Reminders</strong>
+            <small class="ht-muted">{{ reminderNote() }}</small>
+          </span>
+        </button>
+      </div>
+
+      <p class="ht-kicker">ARCHIVED HABITS</p>
+      <div class="ht-settings">
+        @for (habit of archived(); track habit.id) {
+          <button type="button" class="ht-setting" (click)="habits.restore(habit.id)">
+            <app-icon [name]="habit.icon || 'star'" />
+            <span>
+              <strong>{{ habit.name }}</strong>
+              <small class="ht-muted">Tap to restore</small>
+            </span>
+          </button>
+        } @empty {
+          <p class="ht-muted">No archived habits.</p>
+        }
+      </div>
+    </section>
+  `,
 })
 export class SettingsComponent {
   private readonly storage = inject(StorageService);
-  private readonly habits = inject(HabitService);
-  private readonly completions = inject(HabitCompletionService);
-  private readonly fb = inject(FormBuilder);
+  private readonly reminders = inject(ReminderService);
+  readonly habits = inject(HabitService);
+  private readonly habitList = toSignal(this.habits.habits$, { initialValue: this.habits.getAll() });
+  private readonly settings = toSignal(this.storage.settings$, { initialValue: { displayName: '' } });
 
-  readonly notice = signal<string | null>(null);
-  readonly error = signal<string | null>(null);
-  readonly confirmClear = signal(false);
-  readonly form = this.fb.nonNullable.group({
-    displayName: ['', Validators.maxLength(40)],
-  });
-
-  readonly counts = toSignal(
-    combineLatest([this.habits.habits$, this.completions.completions$]).pipe(
-      map(([habits, completions]) => ({ habits: habits.length, completions: completions.length })),
-    ),
-    { initialValue: { habits: 0, completions: 0 } },
-  );
+  readonly name = signal(this.storage.get<{ displayName: string }>('habit-tracker.settings')?.displayName ?? '');
+  readonly reminderNote = signal('Allow notifications for habit reminders');
+  readonly archived = () => (this.habitList() ?? []).filter((habit) => habit.active === false);
 
   constructor() {
-    this.storage.settings$.pipe(take(1), takeUntilDestroyed()).subscribe((settings) => {
-      this.form.patchValue({ displayName: settings.displayName });
-    });
+    this.name.set(this.settings()?.displayName ?? this.name());
   }
 
-  save(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-    try {
-      this.storage.saveSettings({ displayName: this.form.controls.displayName.value });
-      this.notice.set('Settings saved.');
-      this.error.set(null);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Settings could not be saved.');
-    }
+  saveName(event: Event): void {
+    const displayName = (event.target as HTMLInputElement).value.trim().slice(0, 40);
+    this.storage.saveSettings({ displayName });
+    this.name.set(displayName);
   }
 
-  clearData(): void {
-    try {
-      this.habits.replaceAll([]);
-      this.completions.replaceAll([]);
-      this.storage.set(STORAGE_KEYS.meta, { seeded: true });
-      this.confirmClear.set(false);
-      this.notice.set('All habits and history were removed.');
-      this.error.set(null);
-    } catch (error) {
-      this.confirmClear.set(false);
-      this.error.set(error instanceof Error ? error.message : 'Stored data could not be cleared.');
-    }
+  async allowReminders(): Promise<void> {
+    const allowed = await this.reminders.allow();
+    this.reminderNote.set(allowed ? 'Notifications are allowed' : 'Notifications are blocked');
   }
 }

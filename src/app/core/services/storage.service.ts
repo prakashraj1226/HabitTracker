@@ -10,6 +10,7 @@ const PHONE_FILE = 'tracker.json';
 interface TrackerDocument {
   habits: unknown[];
   completions: unknown[];
+  entries: unknown[];
   settings: AppSettings;
   meta: AppMeta;
 }
@@ -97,6 +98,9 @@ export class StorageService {
     if (key === STORAGE_KEYS.meta) {
       return this.document.meta;
     }
+    if (key === STORAGE_KEYS.entries) {
+      return this.document.entries;
+    }
     return undefined;
   }
 
@@ -115,6 +119,10 @@ export class StorageService {
     }
     if (key === STORAGE_KEYS.meta && isMeta(value)) {
       this.document.meta = { seeded: value.seeded };
+      return;
+    }
+    if (key === STORAGE_KEYS.entries && Array.isArray(value)) {
+      this.document.entries = value;
     }
   }
 
@@ -139,6 +147,7 @@ export class StorageService {
       this.document = {
         habits: hasHabits ? habits : [],
         completions: hasCompletions ? completions : [],
+        entries: this.document.entries,
         settings: { displayName: displayName.slice(0, 40) },
         meta: { seeded: true },
       };
@@ -209,13 +218,14 @@ function emptyDocument(): TrackerDocument {
   return {
     habits: [],
     completions: [],
+    entries: [],
     settings: { displayName: '' },
     meta: { seeded: false },
   };
 }
 
 function emptyValue(key: string): unknown {
-  if (key === STORAGE_KEYS.habits || key === STORAGE_KEYS.completions) {
+  if (key === STORAGE_KEYS.habits || key === STORAGE_KEYS.completions || key === STORAGE_KEYS.entries) {
     return [];
   }
   if (key === STORAGE_KEYS.settings) {
@@ -235,6 +245,7 @@ function normalizeDocument(value: unknown): TrackerDocument {
     settings: {
       displayName: isSettings(record.settings) ? record.settings.displayName.slice(0, 40) : '',
     },
+    entries: Array.isArray(record.entries) ? record.entries : [],
     meta: { seeded: isMeta(record.meta) ? record.meta.seeded : false },
   };
 }

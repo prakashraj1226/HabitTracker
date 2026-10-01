@@ -4,4 +4,5 @@ export interface HabitCompletion {
   date: string;
   completed: boolean;
   completedAt?: string;
+  value?: number;
 }

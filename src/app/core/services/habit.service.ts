@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { HABIT_CATEGORIES, STORAGE_KEYS } from '../constants/habit.constants';
-import { Habit, HabitDraft, HabitFrequency } from '../models/habit.model';
+import { STORAGE_KEYS } from '../constants/habit.constants';
+import { Habit, HabitDraft, HabitFrequency, HabitKind, HabitRepeat } from '../models/habit.model';
 import { isValidDateKey } from '../utils/date.util';
 import { HabitCompletionService } from './habit-completion.service';
+import { ReminderService } from './reminder.service';
 import { StorageService } from './storage.service';
 
 const FREQUENCIES: HabitFrequency[] = ['DAILY', 'WEEKLY', 'CUSTOM'];
@@ -12,6 +13,7 @@ const FREQUENCIES: HabitFrequency[] = ['DAILY', 'WEEKLY', 'CUSTOM'];
 export class HabitService {
   private readonly storage = inject(StorageService);
   private readonly completionService = inject(HabitCompletionService);
+  private readonly reminders = inject(ReminderService);
   private readonly errorSubject = new BehaviorSubject<string | null>(null);
   private readonly subject = new BehaviorSubject<Habit[]>(this.read());
   private sequence = 0;
@@ -63,6 +65,14 @@ export class HabitService {
     this.completionService.removeByHabit(id);
   }
 
+  archive(id: number): void {
+    this.setActive(id, false);
+  }
+
+  restore(id: number): void {
+    this.setActive(id, true);
+  }
+
   replaceAll(habits: Habit[]): void {
     this.persist(habits);
   }
@@ -81,10 +91,10 @@ export class HabitService {
     if (description.length > 240) {
       throw new Error('Keep the description under 240 characters.');
     }
-    if (!HABIT_CATEGORIES.includes(category as (typeof HABIT_CATEGORIES)[number])) {
+    if (category.length < 2 || category.length > 24) {
       throw new Error('Choose a category.');
     }
-    if (!FREQUENCIES.includes(draft.frequency)) {
+    if (!FREQUENCIES.includes(draft.frequency) && !draft.repeat) {
       throw new Error('Choose how often this habit repeats.');
     }
     if (!isValidDateKey(draft.startDate)) {
@@ -94,20 +104,30 @@ export class HabitService {
       throw new Error('Enter a valid reminder time.');
     }
     const days = [...new Set((draft.daysOfWeek ?? []).filter((day) => day >= 0 && day <= 6))];
-    if (draft.frequency === 'CUSTOM' && days.length === 0) {
+    const repeat = draft.repeat ?? (draft.frequency === 'WEEKLY' ? 'weekly' : 'once');
+    const frequency: HabitFrequency = repeat === 'weekly' ? 'WEEKLY' : draft.frequency === 'CUSTOM' && days.length ? 'CUSTOM' : 'DAILY';
+    if (frequency === 'CUSTOM' && days.length === 0) {
       throw new Error('Choose at least one day for a custom habit.');
     }
+    const kind: HabitKind = draft.kind === 'measurable' ? 'measurable' : 'tick';
+    const reminderOn = Boolean(draft.reminderEnabled && draft.reminderTime);
     return {
       name,
       description: description || undefined,
       category,
-      frequency: draft.frequency,
+      frequency,
       startDate: draft.startDate,
-      reminderTime: draft.reminderTime || undefined,
+      reminderTime: reminderOn ? draft.reminderTime : undefined,
+      reminderEnabled: reminderOn,
       color: draft.color,
       icon: draft.icon,
       active: draft.active,
-      daysOfWeek: draft.frequency === 'CUSTOM' ? days : undefined,
+      daysOfWeek: frequency === 'CUSTOM' ? days : undefined,
+      kind,
+      intent: draft.intent === 'quit' ? 'quit' : 'build',
+      repeat,
+      unit: kind === 'measurable' ? (draft.unit?.trim() || 'times').slice(0, 20) : undefined,
+      target: clampTarget(draft.target, kind, repeat),
     };
   }
 
@@ -121,7 +141,9 @@ export class HabitService {
         this.errorSubject.next('Saved habits are in an unexpected format.');
         return [];
       }
-      return value.filter((habit) => typeof habit?.id === 'number' && typeof habit?.name === 'string');
+      return value
+        .filter((habit) => typeof habit?.id === 'number' && typeof habit?.name === 'string')
+        .map((habit) => migrateHabit(habit));
     } catch (error) {
       this.errorSubject.next(error instanceof Error ? error.message : 'Saved habits could not be read.');
       return [];
@@ -133,6 +155,7 @@ export class HabitService {
       this.storage.set(STORAGE_KEYS.habits, habits);
       this.subject.next(habits);
       this.errorSubject.next(null);
+      void this.reminders.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Habits could not be saved.';
       this.errorSubject.next(message);
@@ -140,8 +163,42 @@ export class HabitService {
     }
   }
 
+  private setActive(id: number, active: boolean): void {
+    const existing = this.getById(id);
+    if (!existing) {
+      throw new Error('That habit could not be found.');
+    }
+    this.persist(this.subject.value.map((habit) => (
+      habit.id === id ? { ...habit, active, updatedAt: new Date().toISOString() } : habit
+    )));
+  }
+
   private nextId(): number {
     this.sequence += 1;
     return Date.now() * 100 + (this.sequence % 100);
   }
+}
+
+function clampTarget(value: number | undefined, kind: HabitKind, repeat: HabitRepeat): number {
+  const fallback = kind === 'measurable' ? 8 : repeat === 'multiple' ? 2 : 1;
+  const parsed = Number.isFinite(value) ? Math.round(value as number) : fallback;
+  return Math.min(99, Math.max(1, parsed));
+}
+
+function migrateHabit(habit: Habit): Habit {
+  const repeat: HabitRepeat = habit.repeat ?? (habit.frequency === 'WEEKLY' ? 'weekly' : 'once');
+  const kind: HabitKind = habit.kind === 'measurable' ? 'measurable' : 'tick';
+  return {
+    ...habit,
+    kind,
+    intent: habit.intent === 'quit' ? 'quit' : 'build',
+    repeat,
+    unit: kind === 'measurable' ? habit.unit || 'times' : undefined,
+    target: clampTarget(habit.target, kind, repeat),
+    reminderEnabled: habit.reminderEnabled ?? Boolean(habit.reminderTime),
+    color: habit.color || '#3DDC97',
+    icon: habit.icon || 'star',
+    category: habit.category || 'Other',
+    active: habit.active !== false,
+  };
 }
